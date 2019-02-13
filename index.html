@@ -1,0 +1,53 @@
+<html>
+<head>
+    <title>用canvas压缩图片</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0"/>
+
+    <script src="imgCompress.js"></script>
+</head>
+<body>
+
+
+<input type="file" id="file" />
+<div id="preview"></div>
+
+<script>
+
+
+
+    window.onload = function () {
+
+    	var eleFile = document.querySelector('#file');
+
+    	var preview = document.querySelector('#preview');
+
+    	var img = document.createElement('img');
+
+
+        eleFile.addEventListener('change', function(event){
+
+        	var file = event.target.files[0];
+
+        	if(file.type.indexOf("image") === 0){
+
+				imgCompress({
+
+                    file : file,
+
+                    success : function (blob) {
+
+                    	console.log(blob);
+
+                    	img.src = blob;
+						preview.appendChild(img);
+
+					}
+                })
+            }
+        })
+	}
+
+</script>
+</body>
+</html>

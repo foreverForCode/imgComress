@@ -1,0 +1,174 @@
+<html>
+<head>
+    <title>用canvas压缩图片</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0"/>
+</head>
+<body>
+
+
+<input type="file" id="file" />
+<div id="preview"></div>
+<div id="previewBlob"></div>
+<script>
+
+    /**
+     * 实现原理：
+     *  先获取文件，通过canvas指定一个默认最大的宽高，然后把图片写入，此时图片会放在一个小区域中，降低了size
+     *
+     * */
+
+    /**
+     * blob 转化成 img
+     *
+     * @params blob
+     *
+     * @returns img.src
+     *
+     * */
+    function blobToSrc(blob){
+
+		window.URL = window.URL || window.webkitURL;
+
+		var myimg = document.createElement('img');
+
+		myimg.onload = function(){
+
+			window.URL.revokeObjectURL(myimg.src);
+		}
+		myimg.src = window.URL.createObjectURL(blob);
+
+		return myimg.src;
+    }
+
+    /**
+     * base64 转化成 blob
+     *
+     * @param base64
+     *
+     * @returns blob
+     *
+     * */
+
+    function baseToBlob(base64){
+
+    	var bytes = window.atob(base64.split(',')[1]);
+
+    	var ab = new ArrayBuffer(bytes.length);
+
+    	var ia = new Uint8Array(ab);
+
+		for (var i = 0; i < bytes.length; i++) {
+			ia[i] = bytes.charCodeAt(i);
+		}
+
+		return new Blob( [ab] , {type : 'image/png'});
+    }
+    /**
+     * 预览图片
+     *
+     * @params base64数据
+     *
+     * @returns <img>
+     *
+     * */
+
+    function previewImg(base64){
+
+    	var img = document.createElement('img');
+
+    	img.src = base64;
+
+    	return img;
+    }
+
+    window.onload = function () {
+
+    	var eleFile = document.querySelector('#file'),
+            previewFile = document.querySelector('#preview'),
+            previewBlob = document.querySelector('#previewBlob');
+
+    	var reader = new FileReader(), img = new Image();
+
+    	var file = null;
+
+    	var canvas = document.createElement('canvas');
+
+    	var context = canvas.getContext('2d');
+
+    	img.onload = function () {
+
+    		var originWidth = this.width;
+    		var originHeight = this.height;
+
+    		var maxWidth = 400, maxHeight = 400;
+
+    		var targetWidth = originWidth, targetHeight = originHeight;
+
+			// 图片尺寸超过400x400的限制
+			if (originWidth > maxWidth || originHeight > maxHeight) {
+				if (originWidth / originHeight > maxWidth / maxHeight) {
+					// 更宽，按照宽度限定尺寸
+					targetWidth = maxWidth;
+					targetHeight = Math.round(maxWidth * (originHeight / originWidth));
+				} else {
+					targetHeight = maxHeight;
+					targetWidth = Math.round(maxHeight * (originWidth / originHeight));
+				}
+			}
+
+			// canvas对图片进行缩放
+			canvas.width = targetWidth;
+			canvas.height = targetHeight;
+
+			// 清除画布
+			context.clearRect(0, 0, targetWidth, targetHeight);
+			// 图片压缩
+			context.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+			var dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+			// previewFile.appendChild(previewImg(dataUrl));
+
+            var myBlob = baseToBlob(dataUrl);
+
+            console.log(myBlob);
+
+			var myimg = document.createElement('img');
+
+			myimg.src = blobToSrc(myBlob);
+
+			previewFile.appendChild(myimg);
+
+
+			canvas.toBlob(function (blob) {
+
+				console.log(blob);
+
+				var myimg = document.createElement('img');
+
+				myimg.src = blobToSrc(blob);
+
+				previewBlob.appendChild(myimg);
+			})
+		}
+
+        eleFile.addEventListener('change', function(event){
+
+        	file = event.target.files[0];
+
+        	if(file.type.indexOf("image") === 0){
+
+        		reader.readAsDataURL(file);
+            }
+        })
+
+        reader.onload = function (e) {
+
+    		img.src = e.target.result;
+		}
+	}
+
+</script>
+</body>
+</html>
