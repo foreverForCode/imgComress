@@ -1,10 +1,11 @@
 
 /**
  *
- * 原生js实现img压缩，
- * 设想：
- * 	压缩级别：low midium hight
- * 	钩子函数
+ * 原生js实现图片压缩，
+ *
+ * 作者：李想
+ * 日期：2019-2-13
+ * url: https://github.com/foreverForCode/imgComress.git
  *
  * */
 
@@ -45,10 +46,10 @@
 		 *
 		 * @params blob
 		 *
-		 * @returns img.src
+		 * @returns blob 可以预览
 		 *
 		 * */
-		blobToSrc : function(blob){
+		blobToBase : function(blob){
 
 			window.URL = window.URL || window.webkitURL;
 
@@ -78,7 +79,11 @@
 
 			var ab = new ArrayBuffer(bytes.length);
 
+			// ArrayBuffer : 通用的、固定长度的原始二进制数据缓冲区 参考：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer
+
 			var ia = new Uint8Array(ab);
+
+			// Uint8Array : 8位无符号整形数组 参考：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array
 
 			for (var i = 0; i < bytes.length; i++) {
 				ia[i] = bytes.charCodeAt(i);
@@ -86,46 +91,29 @@
 
 			return new Blob( [ab] , {type : 'image/png'});
 		},
-		/**
-		 * 预览图片
-		 *
-		 * @params base64数据
-		 *
-		 * @returns <img>
-		 *
-		 * */
-
-		previewImg : function(base64){
-
-			var img = document.createElement('img');
-
-			img.src = base64;
-
-			return img;
-		}
 	};
 
 	function imgCompress(options) {
 
 		var defaultOpts = {
 
-			level 		: 'low',		// 	压缩级别
-			isCompress 	: true,			//	是否压缩，如果size本身不大可以不压缩
+			mode		: 'product',	//	模式：preview -> 固定400X400 查看图片失真情况	product ->	按照原始图片的70%缩放
+			level 		: 'hight',		//  压缩级别：low ->	图片不失真，但size大  hight -> 图片有少许失真但能看，但size更小
 			suffix		: 'image/png',  //	图片后缀
 			maxWidht	: 400,			// 	图片压缩后实际宽度
 			maxHeight	: 400,			//	图片压缩后实际高度
+			scale		: 0.7,			//	压缩后的图片长宽是原始图片的百分比
 			quality     : 0.7,			//	图片质量（0.1 - 1）
 			size		: 500*1024,		// 	如果size大于500kb，则需要压缩
 			file		: null,			// 	图片资源
-			success		: null,			//	获取图片成功回调
-			error		: null,			//	获取图片失败回调
+			callback	: null,			//	回调参数(status, data) eg: (false, err.msg) || (true, previewDOM, blob)
 		}
 
 		var opts = HELP.extend(defaultOpts, options || {});
 
 		if(!opts.file){
 
-			console.log('请提供file资源');
+			opts.callback && opts.callback(false, "请提供file资源");
 			return;
 		}
 
@@ -142,7 +130,7 @@
 
 			if(type.indexOf("image") == -1){
 
-				console.log("文件类型必须是图片");
+				callback && callback(false,	"文件类型必须是图片");
 				return;
 			}
 
@@ -150,14 +138,6 @@
 
 			var context = canvas.getContext('2d');
 
-			// 如果压缩前的尺寸小于500kb，那么不用压缩
-
-			if(beforeSize < opts.size){
-
-				console.log("尺寸小于500kb，不用压缩");
-
-				return ;
-			}
 
 			var handle = function (base64) {
 
@@ -168,24 +148,34 @@
 					var originWidth = this.width;
 					var originHeight = this.height;
 
-					var maxWidth = 400, maxHeight = 400;
+					if(opts.mode === "preview"){
+
+						var maxWidth = opts.maxWidht, maxHeight = opts.maxHeight;
+					}else{
+
+						var maxWidth = Math.round(originWidth*opts.scale), maxHeight = Math.round(originHeight*opts.scale);
+					}
 
 					var targetWidth = originWidth, targetHeight = originHeight;
 
-					// 图片尺寸超过400x400的限制
+
 					if (originWidth > maxWidth || originHeight > maxHeight) {
+
 						if (originWidth / originHeight > maxWidth / maxHeight) {
 							// 更宽，按照宽度限定尺寸
 							targetWidth = maxWidth;
+
 							targetHeight = Math.round(maxWidth * (originHeight / originWidth));
 						} else {
 							targetHeight = maxHeight;
+
 							targetWidth = Math.round(maxHeight * (originWidth / originHeight));
 						}
 					}
 
 					// canvas对图片进行缩放
 					canvas.width = targetWidth;
+
 					canvas.height = targetHeight;
 
 					// 清除画布
@@ -193,18 +183,34 @@
 					// 图片压缩
 					context.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-					var dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+					// 图片压缩第一种方法
 
+					if(opts.level === 'low'){
 
-					var myBlob = HELP.baseToBlob(dataUrl);
+						// 图片压缩的第二张方法
+						canvas.toBlob(function (blob) {
 
-					callback && callback(dataUrl);
+							if(blob){
 
+								callback && callback(true, HELP.blobToBase(blob), blob)
+							}else{
 
+								callback && callback(false, "图片压缩失败")
+							}
+						})
+					}else{
+
+						var dataUrl = canvas.toDataURL(opts.suffix, opts.quality);
+
+						var myBlob = HELP.baseToBlob(dataUrl);
+
+						callback && callback(true, dataUrl, myBlob);
+					}
 				}
 
 				img.src = base64;
 			}
+
 			if(FileReader){
 
 				var reader = new FileReader();
@@ -213,7 +219,19 @@
 
 					var base64 = e.target.result;
 
-					handle(base64);
+					// 如果压缩前的尺寸小于500kb，那么不用压缩
+
+					if(beforeSize < opts.size){
+
+						console.log("尺寸小于500kb，不用压缩");
+
+						callback && callback(true, base64, HELP.baseToBlob(base64));
+
+					}else{
+
+						handle(base64);
+					}
+
 				}
 
 				reader.readAsDataURL(file);
@@ -221,12 +239,20 @@
 
 				objectURL = URL.createObjectURL(file);  // base64
 
-				handle(objectURL);
-			}
+				if(beforeSize < opts.size){
 
+					console.log("尺寸小于500kb，不用压缩");
+
+					callback && callback(true, base64, HELP.baseToBlob(base64));
+
+				}else{
+
+					handle(objectURL);
+				}
+			}
 		}
 
-		_zip(file, opts.success)
+		_zip(file, opts.callback)
 	}
 
 	return imgCompress;
